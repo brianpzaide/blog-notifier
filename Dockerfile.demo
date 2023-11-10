@@ -1,3 +1,4 @@
+# replace this image name with the image name from the first step
 From brianpzaide/blognotifier
 
 COPY blog_notifier.py .
