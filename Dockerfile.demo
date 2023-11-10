@@ -1,0 +1,3 @@
+From brianpzaide/blognotifier
+
+COPY blog_notifier.py .

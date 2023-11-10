@@ -300,7 +300,7 @@ def notify():
     if conf['mode'] == TELEGRAM_MODE:  # noop
         return
 
-    with smtplib.SMTP_SSL(conf['server']['host'], conf['server']['port']) as smtp:
+    with smtplib.SMTP(conf['server']['host'], conf['server']['port']) as smtp:
         smtp.login(conf['client']['email'], conf['client']['password'])
 
         for _id, mail in execute('SELECT id, mail FROM mails WHERE is_sent = 0'):
@@ -356,7 +356,7 @@ def parse_configuration():
         return
 
     try:
-        with smtplib.SMTP_SSL(conf['server']['host'], conf['server']['port']) as smtp:
+        with smtplib.SMTP(conf['server']['host'], conf['server']['port']) as smtp:
             smtp.login(conf['client']['email'], conf['client']['password'])
     except smtplib.SMTPException:
         print('Check configuration of the server and correctness of credentials')
