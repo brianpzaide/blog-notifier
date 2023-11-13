@@ -1,4 +1,4 @@
 # replace this image name with the image name from the first step
-From brianpzaide/blognotifier
+From hs/blognotifierbase
 
 COPY blog_notifier.py .

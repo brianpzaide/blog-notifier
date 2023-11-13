@@ -12,6 +12,8 @@ EXPOSE 2500 9000 1100
 COPY requirements.txt .
 RUN pip install -r requirements.txt
 
+RUN mkdir dummy-blog
+COPY dummy-blog dummy-blog/
 COPY credentials.yml .
 COPY blog_notifier.sh .
 RUN chmod +x blog_notifier.sh
