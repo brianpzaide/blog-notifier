@@ -9,7 +9,7 @@ async def send_email():
     message["To"] = "recipient@example.com"
     message["Subject"] = "Test Subject"
 
-    async with SMTP(hostname='localhost', port=2500) as smtp:
+    async with SMTP(hostname='127.0.0.1', port=2500) as smtp:
         await smtp.send_message(message)
 
 if __name__ =='__main__':

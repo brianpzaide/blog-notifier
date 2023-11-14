@@ -9,12 +9,12 @@ def decode_subject(header):
     return value
 
 def retrieve_email():
-    server = "localhost:2500"
+    server = "127.0.0.1:2500"
     username = "recipient@example.com"
     password = "your-password"
 
     # Connect to the IMAP server
-    connection = imaplib.IMAP4(server)
+    connection = imaplib.IMAP4(host="127.0.0.1",port="2500")
     connection.login(username, password)
     connection.select("INBOX")
 
