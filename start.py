@@ -1,7 +1,6 @@
 import asyncio
 from smtpserver import start_smtp_server
 from emailsender import send_email
-from emailretriever import retrieve_email
 import multiprocessing
 import subprocess
 
@@ -19,8 +18,6 @@ if __name__ == "__main__":
 
     # Your main program can continue here while the SMTP server runs in the background
     asyncio.run(send_email())
-
-    retrieve_email()
 
     # Optionally, you can wait for the SMTP server process to finish
     # smtp_server_process.terminate()
