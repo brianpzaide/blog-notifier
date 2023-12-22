@@ -1,50 +1,17 @@
-## Blog Notifier
-
-This scripts helps you to add to your watchlist sites with list of updating articles.
-
-Usually sites have typical structure for representing articles or blogposts.
-
-You can explore the one you want.
-
-After that you can crawl for updates whenever you like.
-
-
-### Usage
-
+## Go Sample solution for Blog Notifier
+### To build
 ```bash
->>> python blog_notifier.py --help
->>> python blog_notifier.py -migrate  # create sqlite3 database with empty tables
->>> python blog_notifier.py -crawl    # crawl new articles and send email to client
->>> python blog_notifier.py -explore  https://sysadmin.pm/  # add site to watchlist
+>>> go build -o blognotifier .
 ```
-
-### Example configuration
-
-```yaml
-mode: mail
-
-server:
-  host: smtp.gmail.com
-  port: 465
-
-client:
-  email: example@gmail.com
-  password: examplepassword
-  send_to: example@gmail.com
-
-telegram:
-  bot_token: token
-  channel: @channel
-```
-
-Also you can define client's credentiials with environment variables.
-
+### To run
+```aiosmtpd``` is great for running the SMTP server locally.
+In one terminal
+```aiosmtpd -nl "127.0.0.1:25000"``` to run pythons's ```aiosmtpd``` server
+in the second terminal run the python's ```http.server``` module
 ```bash
-$ export NOTIFIER_CONFIG='credentials.yml'
-$ export NOTIFIER_DB='db.sqlite3'
-$ export NOTIFIER_CLIENT_EMAIL='example@gmail.com'
-$ export NOTIFIER_CLIENT_PASSWORD='examplepassword'
-$ export NOTIFIER_CLIENT_SEND_TO='example@gmail.com'
-$ export NOTIFIER_TELEGRAM_BOT_TOKEN='token'
-$ export NOTIFIER_TELEGRAM_CHANNEL='@channel'
+python3 -m http.server
+```
+in the third terminal run the blognotifier.go programm
+```bash
+./blognotifier --[migrate|explore|crawl]
 ```
