@@ -6,8 +6,9 @@
 ### To run
 ```aiosmtpd``` is great for running the SMTP server locally.
 In one terminal
-```aiosmtpd -nl "127.0.0.1:25000"``` to run pythons's ```aiosmtpd``` server
-in the second terminal run the python's ```http.server``` module
+```bash aiosmtpd -nl "127.0.0.1:25000"``` to run pythons's ```aiosmtpd``` server.
+
+In the second terminal run the python's ```http.server``` module
 ```bash
 python3 -m http.server
 ```
