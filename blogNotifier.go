@@ -56,7 +56,7 @@ type emailServer struct {
 type emailClient struct {
 	Email    string
 	Password string
-	Send_to  string
+	SendTo   string `yaml:"send_to"`
 }
 
 type blogNotifierConfig struct {
@@ -76,98 +76,85 @@ type mailStruct struct {
 
 var conf blogNotifierConfig
 var (
-	mail_addr, sender, recipient, password string
+	mailAddr, sender, recipient, password string
 )
 
 // Parsing Config File  //
 func parseConfig() error {
-	f, err := os.Open(CONFIG_FILE)
+	b, err := os.ReadFile(CONFIG_FILE)
 	if err != nil {
-		fmt.Printf("error opening config file %s\n", CONFIG_FILE)
-		return err
-	}
-	defer func() {
-		if r := recover(); r != nil {
-			f.Close()
-		}
-	}()
-	b := make([]byte, 1024)
-	n, err := f.Read(b)
-	if err != nil {
-		fmt.Printf("error reading the config file %s\n", CONFIG_FILE)
 		return err
 	}
 
 	conf = blogNotifierConfig{}
 
-	err = yaml.Unmarshal(b[0:n], &conf)
+	err = yaml.Unmarshal(b, &conf)
 	if err != nil {
 		fmt.Printf("error unmarshalling the config file %s", CONFIG_FILE)
 		return err
 	}
 	fmt.Println("parsing config")
-	mail_addr = fmt.Sprintf("%s:%d", conf.Server.Host, conf.Server.Port)
-	sender, password, recipient = conf.Client.Email, conf.Client.Password, conf.Client.Send_to
-	fmt.Println(mail_addr, sender, password, recipient)
+	mailAddr = fmt.Sprintf("%s:%d", conf.Server.Host, conf.Server.Port)
+	sender, password, recipient = conf.Client.Email, conf.Client.Password, conf.Client.SendTo
+	fmt.Println(mailAddr, sender, password, recipient)
 	return nil
 }
 
-//	Getting database connection, It is important to note that To enable foreign key support in SQLite,
-//
+// Getting database connection, It is important to note that To enable foreign key support in SQLite,
 // you need to ensure that the foreign key constraints are enabled for each database connection.
 // This must be done after opening a database connection using SQLite.
-func getDBConnection() *sql.DB {
+func getDBConnection() (*sql.DB, error) {
 	// os.Remove(BLOGS_DB)
 	db, err := sql.Open("sqlite3", BLOGS_DB)
 	if err != nil {
-		log.Fatal(err)
+		return nil, err
 	}
 	_, err = db.Exec("PRAGMA foreign_keys = ON;")
 	if err != nil {
 		fmt.Println("Error enabling foreign key constraints:", err)
-		db.Close()
-		panic(err)
+		return nil, err
 	}
-	return db
+	return db, nil
 }
 
 // Creating Database tables //
-func migrate() {
+func migrate() error {
 
-	db := getDBConnection()
-	// create database tables
-	defer func() {
-		if r := recover(); r != nil {
-			db.Close()
-		}
-	}()
-	_, err := db.Exec(CREATE_BLOGS_TABLE)
+	db, err := getDBConnection()
+	if err != nil {
+		return err
+	}
+	defer db.Close()
+	_, err = db.Exec(CREATE_BLOGS_TABLE)
 	if err != nil {
 		fmt.Println("error creating blogs table")
-		panic(err)
+		return err
 	}
 
 	_, err = db.Exec(CREATE_POSTS_TABLE)
 	if err != nil {
 		fmt.Println("error creating posts table")
-		panic(err)
+		return err
 	}
 
 	_, err = db.Exec(CREATE_MAILS_TABLE)
 	if err != nil {
 		fmt.Println("error creating mails table")
-		panic(err)
+		return err
 	}
+	return nil
 }
 
-// Checking if the blog exists
-func blog_exists(site string) (bool, error) {
+func entityExists(query string, args ...any) (bool, error) {
 	// does the blog with name 'site' exists
-	db := getDBConnection()
+	db, err := getDBConnection()
+	if err != nil {
+		return false, err
+	}
 	defer db.Close()
-	row := db.QueryRow(IS_BLOG, site)
+	row := db.QueryRow(query, args...)
 	i := -1
-	err := row.Scan(&i)
+	err = row.Scan(&i)
 
 	if err != nil {
 		if err == sql.ErrNoRows {
@@ -176,33 +163,24 @@ func blog_exists(site string) (bool, error) {
 		return false, err
 	}
 	return i >= 0, nil
-
 }
 
-// checking if the posts exists
-func post_exists(site, post string) (bool, error) {
-	// does the blog with name 'site' exists
-	db := getDBConnection()
-	defer db.Close()
-	row := db.QueryRow(IS_POST, site, post)
-	i := -1
-	err := row.Scan(&i)
+func blogExists(site string) (bool, error) {
+	return entityExists(IS_BLOG, site)
+}
 
-	if err != nil {
-		if err == sql.ErrNoRows {
-			return false, nil
-		}
-		return false, err
-	}
-	return i >= 0, nil
-
+func postExists(site, post string) (bool, error) {
+	return entityExists(IS_POST, site, post)
 }
 
 // function to add a new site
-func add_new_site(site, link string) error {
-	db := getDBConnection()
+func addNewSite(site, link string) error {
+	db, err := getDBConnection()
+	if err != nil {
+		return err
+	}
 	defer db.Close()
-	_, err := db.Exec(ADD_NEW_BLOG, site, link)
+	_, err = db.Exec(ADD_NEW_BLOG, site, link)
 	if err != nil {
 		return err
 	}
@@ -210,12 +188,15 @@ func add_new_site(site, link string) error {
 }
 
 // first check if the post already exists in the database, if not insert a new entry
-func add_new_post_if_not_exist(site, link string) (bool, error) {
-	db := getDBConnection()
+func addNewPostIfNotExist(site, link string) (bool, error) {
+	db, err := getDBConnection()
+	if err != nil {
+		return false, err
+	}
 	defer db.Close()
 	row := db.QueryRow(IS_POST, site, link)
 	i := -1
-	err := row.Scan(&i)
+	err = row.Scan(&i)
 
 	if err != nil {
 		if err == sql.ErrNoRows {
@@ -231,10 +212,13 @@ func add_new_post_if_not_exist(site, link string) (bool, error) {
 }
 
 // functionality to add new mails, new mails containg info about new posts that users need to be notified about
-func add_mail(site, link string) error {
-	db := getDBConnection()
+func addMail(site, link string) error {
+	db, err := getDBConnection()
+	if err != nil {
+		return err
+	}
 	defer db.Close()
-	_, err := db.Exec(ADD_NEW_MAIL, fmt.Sprintf(MAIL_MESSAGE, site, link))
+	_, err = db.Exec(ADD_NEW_MAIL, fmt.Sprintf(MAIL_MESSAGE, site, link))
 	if err != nil {
 		return err
 	}
@@ -242,16 +226,18 @@ func add_mail(site, link string) error {
 }
 
 // list all the the sites the user is subscribing to
-func list_all_sites() ([]string, error) {
+func listAllSites() ([]string, error) {
 	// list all the sites that are saved to the database
-	postLinks := make([]string, 0)
-	db := getDBConnection()
+	db, err := getDBConnection()
+	if err != nil {
+		return nil, err
+	}
 	defer db.Close()
 	rows, err := db.Query(FETCH_BLOGS)
 	if err != nil {
 		return nil, err
 	}
-
+	postLinks := make([]string, 0)
 	for rows.Next() {
 		_site, last_link := "", ""
 		rows.Scan(&_site, &last_link)
@@ -262,9 +248,12 @@ func list_all_sites() ([]string, error) {
 }
 
 // fetches all the mails that are not yet sent to the user
-func fetch_mails() ([]mailStruct, error) {
-	db := getDBConnection()
+func fetchMails() ([]mailStruct, error) {
+	db, err := getDBConnection()
 	defer db.Close()
+	if err != nil {
+		return nil, err
+	}
 	rows, err := db.Query(FETCH_MAILS)
 	if err != nil {
 		return nil, err
@@ -287,7 +276,10 @@ func fetch_mails() ([]mailStruct, error) {
 
 // fetches posts that are already existing in the database
 func getExistingPosts() (map[string][]string, error) {
-	db := getDBConnection()
+	db, err := getDBConnection()
+	if err != nil {
+		return nil, err
+	}
 	defer db.Close()
 	rows, err := db.Query(FETCH_POSTS)
 	if err != nil {
@@ -309,11 +301,14 @@ func getExistingPosts() (map[string][]string, error) {
 }
 
 // implements a functionality to remove a site
-func remove_site(site string) error {
+func removeSite(site string) error {
 	// remove a site from the watch list
-	db := getDBConnection()
+	db, err := getDBConnection()
+	if err != nil {
+		return err
+	}
 	defer db.Close()
-	_, err := db.Exec(REMOVE_SITE, site)
+	_, err = db.Exec(REMOVE_SITE, site)
 	if err != nil {
 		fmt.Printf("error deleting a site %s from the blogs table\n", site)
 		return err
@@ -322,11 +317,14 @@ func remove_site(site string) error {
 }
 
 // updates the last visited site if new post in the blog site
-func update_last_site_visited(site, link string) error {
+func updateLastSiteVisited(site, link string) error {
 	// remove a site from the watch list
-	db := getDBConnection()
+	db, err := getDBConnection()
+	if err != nil {
+		return err
+	}
 	defer db.Close()
-	_, err := db.Exec(UPDATE_BLOG, link, site)
+	_, err = db.Exec(UPDATE_BLOG, link, site)
 	if err != nil {
 		fmt.Printf("error updating last_link %s for blog %s in the blogs table\n", link, site)
 		return err
@@ -335,11 +333,14 @@ func update_last_site_visited(site, link string) error {
 }
 
 // after sending the mails mark the mails in the database as sent
-func update_mail(id int) error {
+func updateMail(id int) error {
 	// remove a site from the watch list
-	db := getDBConnection()
+	db, err := getDBConnection()
+	if err != nil {
+		return err
+	}
 	defer db.Close()
-	_, err := db.Exec(UPDATE_MAIL, id)
+	_, err = db.Exec(UPDATE_MAIL, id)
 	if err != nil {
 		fmt.Printf("error updating is_sent id %d in the mails table\n", id)
 		return err
@@ -378,35 +379,40 @@ func findAllLinks(site string) ([]string, error) {
 }
 
 // implementing the explore functionality
-func explore(newSite string) {
+func explore(newSite string) error {
 	// first check if the site exists
-	ok, err := blog_exists(newSite)
+	ok, err := blogExists(newSite)
 	if err != nil {
-		panic(fmt.Sprintf("error checking whether a site %s exists in the blogs table\n", newSite))
+		fmt.Printf("error checking whether a site %s exists in the blogs table\n", newSite)
+		return err
 	}
 	// if the blog does not exist in the blogs table, then insert a new item in the blogs table else noop
 	if !ok {
 		links, err := findAllLinks(newSite)
 		if err != nil {
 			fmt.Printf("error finding links in a new site %s \n", newSite)
-			panic(err)
+			return err
 		}
 		last_link := ""
 		if len(links) > 0 {
 			last_link = links[0]
 		}
-		err = add_new_site(newSite, last_link)
+		err = addNewSite(newSite, last_link)
 		if err != nil {
 			fmt.Printf("error adding a new site %s into the blogs table\n", newSite)
-			panic(err)
+			return err
 		}
+	} else {
+		fmt.Printf("site %s already in the watch list\n", newSite)
 	}
+
+	return nil
 }
 
 // fetches mails that need to be sent, sends the mails, updates the database if the mail is sent successfully
 func notify() error {
 	// fetching all the new messages or messages that are not sent
-	mails, err := fetch_mails()
+	mails, err := fetchMails()
 	if err != nil {
 		return err
 	}
@@ -418,7 +424,7 @@ func notify() error {
 		wg.Add(1)
 		go func(_mail mailStruct) {
 			defer wg.Done()
-			err := smtp.SendMail(mail_addr, nil, sender, []string{recipient}, []byte(_mail.msg))
+			err := smtp.SendMail(mailAddr, nil, sender, []string{recipient}, []byte(_mail.msg))
 			if err == nil {
 				deliveredCh <- _mail.id
 			} else {
@@ -434,7 +440,7 @@ func notify() error {
 	}()
 
 	for id := range deliveredCh {
-		err = update_mail(id)
+		err = updateMail(id)
 	}
 	for err := range errCh {
 		fmt.Println("error delivering mail")
@@ -465,14 +471,14 @@ func _crawl(site, link string, links *[]blogPostsLink) error {
 }
 
 // implements the crawl functionality
-func crawl() map[string][]string {
+func crawl() (map[string][]string, error) {
 	// crawl the sites
 
 	// get the all the blogs
-	blogs, err := list_all_sites()
+	blogs, err := listAllSites()
 	if err != nil {
-		fmt.Printf("error fetching items from blogs table")
-		panic(err)
+		fmt.Printf("error fetching items from blogs table\n")
+		return nil, err
 	}
 
 	postsCh := make(chan []blogPostsLink)
@@ -490,6 +496,13 @@ func crawl() map[string][]string {
 			} else {
 				postsCh <- links
 			}
+			if n := len(links) - 1; n > 0 {
+				err = updateLastSiteVisited(site, links[n].link)
+				if err != nil {
+					errCh <- err
+				}
+			}
+
 		}(blog)
 	}
 
@@ -499,53 +512,60 @@ func crawl() map[string][]string {
 		close(errCh)
 	}()
 
-	site_links_map := make(map[string][]string)
+	siteLinksMap := make(map[string][]string)
 
 	for linksSlice := range postsCh {
 		blog := linksSlice[0].site
-		_, ok := site_links_map[blog]
+		_, ok := siteLinksMap[blog]
 		if !ok {
-			site_links_map[blog] = make([]string, 0)
+			siteLinksMap[blog] = make([]string, 0)
 		}
 		for _, link := range linksSlice {
-			site_links_map[blog] = append(site_links_map[blog], link.link)
+			siteLinksMap[blog] = append(siteLinksMap[blog], link.link)
 		}
 	}
 	for err := range errCh {
 		fmt.Println(err)
 	}
 
-	return site_links_map
+	return siteLinksMap, nil
 
 }
 
 // parses the config file, crawls the blog site, finds new blogposts
 // and notifies the user if there are any new blog posts
-func run() {
+func run() error {
 	// parse the config
 	err := parseConfig()
 	if err != nil {
-		log.Fatal(err)
+		return err
 	}
 	// crawl
-	site_links_map := crawl()
+	site_links_map, err := crawl()
+	if err != nil {
+		return err
+	}
 	// update the database for the new posts
 	for blog, posts := range site_links_map {
 		for _, post := range posts {
-			ok, err := add_new_post_if_not_exist(blog, post)
+			ok, err := addNewPostIfNotExist(blog, post)
 			if err != nil {
-				log.Fatal(err)
+				return err
 			}
 			if ok {
-				err = add_mail(blog, post)
+				err = addMail(blog, post)
 				if err != nil {
-					log.Fatal(err)
+					return err
 				}
 			}
 		}
 	}
 	// notify the user about the new sites
-	notify()
+	err = notify()
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 func main() {
@@ -560,22 +580,29 @@ func main() {
 
 	if *migrateFlag {
 		fmt.Println("migrate")
-		migrate()
+		err := migrate()
+		if err != nil {
+			log.Fatal(err)
+		}
 	}
 
 	if *crawlFlag {
 		fmt.Println("crawl")
-		run()
+		if err := run(); err != nil {
+			log.Fatal(err)
+		}
 	}
 
 	if *exploreFlag != "" {
 		fmt.Println("explore")
-		explore(*exploreFlag)
+		if err := explore(*exploreFlag); err != nil {
+			log.Fatal(err)
+		}
 	}
 
 	if *listFlag {
 		fmt.Println("list")
-		sites, err := list_all_sites()
+		sites, err := listAllSites()
 		if err != nil {
 			log.Fatal(err)
 		}
@@ -586,7 +613,7 @@ func main() {
 
 	if *removeFlag != "" {
 		fmt.Println("remove")
-		if err := remove_site(*removeFlag); err != nil {
+		if err := removeSite(*removeFlag); err != nil {
 			log.Fatal(err)
 		}
 	}
