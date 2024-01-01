@@ -9,6 +9,8 @@ import (
 	"github.com/PuerkitoBio/goquery"
 )
 
+const MAX_DEPTH = 3
+
 // finds all the links in a blog post
 func findAllLinks(site string) ([]string, error) {
 	res, err := http.Get(site)
@@ -40,12 +42,16 @@ func findAllLinks(site string) ([]string, error) {
 }
 
 // recursive crawl function
-func _crawl(link string, links *[]string) error {
+func _crawl(link string, links *[]string, depth int) error {
+	if depth > MAX_DEPTH {
+		return nil
+	}
 	_links, err := findAllLinks(link)
 	if err == nil {
 		for _, _link := range _links {
+			fmt.Printf("%s at depth %d\n", _link, depth)
 			*links = append(*links, _link)
-			err := _crawl(_link, links)
+			err := _crawl(_link, links, depth+1)
 			if err != nil {
 				return fmt.Errorf("%s: error in recursive crawl", link)
 			}
@@ -61,7 +67,7 @@ func crawl(blogSite string) ([]string, error) {
 	// crawl the sites
 
 	links := make([]string, 0)
-	err := _crawl(blogSite, &links)
+	err := _crawl(blogSite, &links, 0)
 	if err != nil {
 		return nil, err
 	} else {
