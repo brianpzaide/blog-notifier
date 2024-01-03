@@ -220,27 +220,22 @@ func listAllSites() (map[string]string, error) {
 	return blogAndLastLink, nil
 }
 
-// fetches posts that are already existing in the database
-func getExistingPosts() (map[string][]string, error) {
+func getPostsForSite(site string) ([]string, error) {
 	db, err := getDBConnection()
 	if err != nil {
 		return nil, err
 	}
 	defer db.Close()
-	rows, err := db.Query(FETCH_POSTS)
+	rows, err := db.Query(FETCH_POSTS_FOR_BLOG, site)
 	if err != nil {
 		return nil, err
 	}
-	existingPosts := make(map[string][]string)
+	existingPosts := make([]string, 0)
 	for rows.Next() {
-		_s, _l := "", ""
-		err := rows.Scan(&_s, &_l)
+		_l := ""
+		err := rows.Scan(&_l)
 		if err == nil {
-			_, ok := existingPosts[_s]
-			if !ok {
-				existingPosts[_s] = make([]string, 0)
-			}
-			existingPosts[_s] = append(existingPosts[_s], _l)
+			existingPosts = append(existingPosts, _l)
 		}
 	}
 	return existingPosts, nil
@@ -420,12 +415,14 @@ func main() {
 	removeFlag := flag.String("remove", "", "Remove site from watchlist")
 	crawlFlag := flag.Bool("crawl", false, "Crawl all the blog sites curently in the blogs table (watchlist)")
 
+	listPostFlag := flag.NewFlagSet("listPost", flag.ExitOnError)
 	updateFlag := flag.NewFlagSet("updateLastLink", flag.ExitOnError)
 
 	// Define multiple flags for the FlagSet
 	var (
 		flagBlogSite = updateFlag.String("site", "", "web address of the blog site")
 		flagLastLink = updateFlag.String("post", "", "web address of the latest blog post")
+		flagSite     = listPostFlag.String("site", "", "web address of the blog site")
 	)
 
 	fmt.Println(strings.Join(os.Args, " "))
@@ -481,9 +478,19 @@ func main() {
 				log.Fatal(err)
 			}
 		}
+	} else if os.Args[1] == "listPosts" {
+		listPostFlag.Parse(os.Args[2:])
+		if *flagSite != "" {
+			blogPosts, err := getPostsForSite(*flagSite)
+			if err != nil {
+				log.Fatal(err)
+			}
+			for _, bp := range blogPosts {
+				fmt.Println(bp)
+			}
+		}
 	} else {
 		fmt.Println("Invalid command")
-		fmt.Println("Usage: updateLastLink --site <site> --post <post>")
 		os.Exit(1)
 	}
 }
