@@ -49,7 +49,7 @@ func _crawl(link string, links *[]string, depth int) error {
 	_links, err := findAllLinks(link)
 	if err == nil {
 		for _, _link := range _links {
-			fmt.Printf("%s at depth %d\n", _link, depth)
+			// fmt.Printf("%s at depth %d\n", _link, depth)
 			*links = append(*links, _link)
 			err := _crawl(_link, links, depth+1)
 			if err != nil {
