@@ -415,14 +415,14 @@ func main() {
 	removeFlag := flag.String("remove", "", "Remove site from watchlist")
 	crawlFlag := flag.Bool("crawl", false, "Crawl all the blog sites curently in the blogs table (watchlist)")
 
-	listPostFlag := flag.NewFlagSet("listPost", flag.ExitOnError)
+	listPostsFlag := flag.NewFlagSet("listPosts", flag.ExitOnError)
 	updateFlag := flag.NewFlagSet("updateLastLink", flag.ExitOnError)
 
 	// Define multiple flags for the FlagSet
 	var (
 		flagBlogSite = updateFlag.String("site", "", "web address of the blog site")
 		flagLastLink = updateFlag.String("post", "", "web address of the latest blog post")
-		flagSite     = listPostFlag.String("site", "", "web address of the blog site")
+		flagSite     = listPostsFlag.String("site", "", "web address of the blog site")
 	)
 
 	fmt.Println(strings.Join(os.Args, " "))
@@ -453,7 +453,7 @@ func main() {
 				log.Fatal(err)
 			}
 			for site, lastLink := range sites {
-				fmt.Printf("%s %s", site, lastLink)
+				fmt.Printf("%s %s\n", site, lastLink)
 			}
 		}
 		if *removeFlag != "" {
@@ -479,7 +479,7 @@ func main() {
 			}
 		}
 	} else if os.Args[1] == "listPosts" {
-		listPostFlag.Parse(os.Args[2:])
+		listPostsFlag.Parse(os.Args[2:])
 		if *flagSite != "" {
 			blogPosts, err := getPostsForSite(*flagSite)
 			if err != nil {
