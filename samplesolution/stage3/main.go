@@ -86,7 +86,7 @@ func crawl(blogSite string) ([]string, error) {
 
 func main() {
 	// Parse command-line arguments
-	crawlFlag := flag.String("crawl", "", "Crawl web links")
+	crawlFlag := flag.String("crawlSite", "", "Crawl the given website")
 
 	flag.Parse()
 
