@@ -86,34 +86,6 @@ func migrate() error {
 	return nil
 }
 
-func entityExists(query string, args ...any) (bool, error) {
-	// does the blog with name 'site' exists
-	db, err := getDBConnection()
-	if err != nil {
-		return false, err
-	}
-	defer db.Close()
-	row := db.QueryRow(query, args...)
-	i := -1
-	err = row.Scan(&i)
-
-	if err != nil {
-		if err == sql.ErrNoRows {
-			return false, nil
-		}
-		return false, err
-	}
-	return i >= 0, nil
-}
-
-func blogExists(site string) (bool, error) {
-	return entityExists(IS_BLOG, site)
-}
-
-func postExists(site, post string) (bool, error) {
-	return entityExists(IS_POST, site, post)
-}
-
 // function to add a new site
 func addNewSite(site, link string) error {
 	db, err := getDBConnection()
@@ -129,7 +101,7 @@ func addNewSite(site, link string) error {
 }
 
 // list all the the sites the user is subscribing to
-func listAllSites() ([]string, error) {
+func listAllSites() (map[string]string, error) {
 	// list all the sites that are saved to the database
 	db, err := getDBConnection()
 	if err != nil {
@@ -140,14 +112,16 @@ func listAllSites() ([]string, error) {
 	if err != nil {
 		return nil, err
 	}
-	postLinks := make([]string, 0)
+	blogAndLastLink := make(map[string]string, 0)
 	for rows.Next() {
 		_site, last_link := "", ""
 		rows.Scan(&_site, &last_link)
-		postLinks = append(postLinks, _site)
+
+		// postLinks = append(postLinks, _site)
+		blogAndLastLink[_site] = last_link
 		fmt.Printf("retrieved site: %s, last_link: %s\n", _site, last_link)
 	}
-	return postLinks, nil
+	return blogAndLastLink, nil
 }
 
 // implements a functionality to remove a site
@@ -226,8 +200,8 @@ func main() {
 			if err != nil {
 				log.Fatal(err)
 			}
-			for _, site := range sites {
-				fmt.Println(site)
+			for site, lastPost := range sites {
+				fmt.Printf("%s %s\n", site, lastPost)
 			}
 		}
 		if *removeFlag != "" {
@@ -248,7 +222,6 @@ func main() {
 		}
 	} else {
 		fmt.Println("Invalid command")
-		fmt.Println("Usage: updateLastLink --site <site> --post <post>")
 		os.Exit(1)
 	}
 }
