@@ -411,37 +411,6 @@ func findAllLinks(site string) ([]string, error) {
 	return links, nil
 }
 
-// implementing the explore functionality
-func explore(newSite string) error {
-	// first check if the site exists
-	ok, err := blogExists(newSite)
-	if err != nil {
-		fmt.Printf("error checking whether a site %s exists in the blogs table\n", newSite)
-		return err
-	}
-	// if the blog does not exist in the blogs table, then insert a new item in the blogs table else noop
-	if !ok {
-		links, err := findAllLinks(newSite)
-		if err != nil {
-			fmt.Printf("error finding links in a new site %s \n", newSite)
-			return err
-		}
-		last_link := ""
-		if len(links) > 0 {
-			last_link = links[0]
-		}
-		err = addNewSite(newSite, last_link)
-		if err != nil {
-			fmt.Printf("error adding a new site %s into the blogs table\n", newSite)
-			return err
-		}
-	} else {
-		fmt.Printf("site %s already in the watch list\n", newSite)
-	}
-
-	return nil
-}
-
 // fetches mails that need to be sent, sends the mails, updates the database if the mail is sent successfully
 func notify() error {
 	// fetching all the new messages or messages that are not sent
