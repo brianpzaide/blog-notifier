@@ -379,20 +379,27 @@ func crawl() (map[string][]string, error) {
 		case linksSlice, is_open := <-postsCh:
 			if !is_open {
 				postsCh = nil
+			}else{
+
+				if len(linksSlice) == 0 {
+					continue
+				}
+				blog := linksSlice[0].site
+				_, ok := siteLinksMap[blog]
+				if !ok {
+					siteLinksMap[blog] = make([]string, 0)
+				}
+				for _, link := range linksSlice {
+					siteLinksMap[blog] = append(siteLinksMap[blog], link.link)
+				}
 			}
-			if len(linksSlice) == 0 {
-				continue
+		case err, is_open := <-errCh:
+			if !is_open{
+				errCh = nil
+			}else{
+
+				fmt.Println(err)
 			}
-			blog := linksSlice[0].site
-			_, ok := siteLinksMap[blog]
-			if !ok {
-				siteLinksMap[blog] = make([]string, 0)
-			}
-			for _, link := range linksSlice {
-				siteLinksMap[blog] = append(siteLinksMap[blog], link.link)
-			}
-		case err := <-errCh:
-			fmt.Println(err)
 		case <-doneCh:
 			return siteLinksMap, nil
 		}

@@ -501,8 +501,9 @@ func crawl() (map[string][]string, error) {
 		return nil, fmt.Errorf("error fetching items from blogs table\n")
 	}
 
-	postsCh := make(chan []blogPostsLink)
-	errCh := make(chan error)
+	postsCh := make(chan []blogPostsLink, len(blogs))
+	errCh := make(chan error, len(blogs))
+	doneCh := make(chan bool, 0)
 	wg := &sync.WaitGroup{}
 
 	for _, blog := range blogs {
@@ -529,27 +530,41 @@ func crawl() (map[string][]string, error) {
 		wg.Wait()
 		close(postsCh)
 		close(errCh)
+		close(doneCh)
 	}()
 
 	siteLinksMap := make(map[string][]string)
 
-	for linksSlice := range postsCh {
-		if len(linksSlice) == 0 {
-			continue
-		}
-		blog := linksSlice[0].site
-		_, ok := siteLinksMap[blog]
-		if !ok {
-			siteLinksMap[blog] = make([]string, 0)
-		}
-		for _, link := range linksSlice {
-			siteLinksMap[blog] = append(siteLinksMap[blog], link.link)
+	for {
+		select {
+		case linksSlice, is_open := <-postsCh:
+			if !is_open {
+				postsCh = nil
+			} else {
+				if len(linksSlice) == 0 {
+					continue
+				}
+				blog := linksSlice[0].site
+				_, ok := siteLinksMap[blog]
+				if !ok {
+					siteLinksMap[blog] = make([]string, 0)
+				}
+				for _, link := range linksSlice {
+					siteLinksMap[blog] = append(siteLinksMap[blog], link.link)
+				}
+			}
+
+		case err, is_open := <-errCh:
+			if !is_open {
+				errCh = nil
+			} else {
+				fmt.Println(err)
+			}
+
+		case <-doneCh:
+			return siteLinksMap, nil
 		}
 	}
-	for err := range errCh {
-		fmt.Println(err)
-	}
-	return siteLinksMap, nil
 }
 
 func syncBlogs(configFile string) error {
